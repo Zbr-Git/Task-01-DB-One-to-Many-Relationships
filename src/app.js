@@ -1,33 +1,16 @@
+
 import express from 'express';
+import allRoutes from './routes/index.js';
+import { connectionDB } from './db/config.js';
 
 const app = express();
+app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Home Page',
-  });
-});
+connectionDB();
 
-app.get('/about', (req, res) => {
-  res.json({
-    result: {
-      message: 'About Page',
-    },
-  });
-});
+// All routes
+app.use(allRoutes);
 
-app.get('/contact', (req, res) => {
-  res.json({
-    message: 'Contact Page',
-  });
-});
-
-app.get('/gallery', (req, res) => {
-  res.json({
-    message: 'Gallery Page',
-  });
-});
-
-app.listen(5000, () => {
-  console.log('Server started...');
+app.listen(3000, () => {
+  console.log(`Server listening on 3000`);
 });
