@@ -1,8 +1,15 @@
 import { Sequelize } from 'sequelize';
 
+const dbName = process.env.DB_NAME;
+const dbUsername = process.env.DB_USERNAME;
+const dbPasswrord = process.env.DB_PASSWORD;
+const dbHostname = process.env.DB_HOSTNAME;
+
+// console.log(dbUsername, dbName, dbHostname);
+
 // Option 3: Passing parameters separately (other dialects)
-const sequelize = new Sequelize('demo', 'postgres', '12345', {
-  host: 'localhost',
+const sequelize = new Sequelize(dbName, dbUsername, dbPasswrord, {
+  host: dbHostname,
   dialect: 'postgres',
 });
 
