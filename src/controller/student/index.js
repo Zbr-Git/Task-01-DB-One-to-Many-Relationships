@@ -1,30 +1,28 @@
-let students = [
-  {
-    id: 1,
-    name: 'john',
-    city: 'lahore',
-  },
-  {
-    id: 2,
-    name: 'hamza',
-    city: 'peshawar',
-  },
-];
+import { where } from 'sequelize';
+import StudentModel from '../../model/student/index.js';
+
 
 const StudentController = {
-  getAllStudents: (req, res) => {
+  getAllStudents: async (req, res) => {
     try {
-      res.json({
+      const students = await StudentModel.findAll();
+      res.status(200).json({
         students,
       });
     } catch (error) {
       console.log('Error while fetching the Students', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   },
-  getSingleStudent: (req, res) => {
+  getSingleStudent: async (req, res) => {
     try {
       const { id } = req.params;
-      const student = students.find((student) => student.id === parseInt(id));
+      const student = await StudentModel.findByPk(id);
+      // const student = await StudentModel.findOne({
+      //   where: {
+      //     id,
+      //   },
+      // });
 
       res.json({
         message: 'Record Found',
@@ -32,62 +30,63 @@ const StudentController = {
       });
     } catch (error) {
       console.log('Error getting single student record', error);
+      res.status(500).json({ message: 'internal server error' });
     }
   },
-  createStudent: (req, res) => {
+  createStudent: async (req, res) => {
     try {
-      const newStudent = req.body;
-      console.log('req.body:', req.body);
-      students.push(newStudent);
-      res.json({
-        message: 'Created student record',
-        students: newStudent,
+      const payload = req.body;
+      console.log('payload', payload);
+      const student = await StudentModel.create({
+        firstName: payload.firstName,
+        lastName: payload.lastName,
       });
-      console.log('--newStudent:', newStudent);
-      console.log('students:', students);
+      res.status(200).json({
+        message: 'Created student record',
+        student: student,
+      });
     } catch (error) {
       console.log('Error creating a new Student', error);
     }
   },
-  updateStudent: (req, res) => {
+  updateStudent: async (req, res) => {
     try {
       const { id } = req.params;
-      let { name, city } = req.body;
+      const payload = req.body;
 
-      const studentIndex = students.findIndex(
-        (student) => student.id === parseInt(id)
-      );
+      const student = await StudentModel.findByPk(id);
 
-      if (studentIndex === -1) {
+      if (!student) {
         return res.status(404).json({ message: 'Student not found' });
       }
 
-      // students[studentIndex].name = name;
-      // students.studentIndex.city = city;
+      // Update student's information
+      student.firstName = payload.firstName;
+      student.lastName = payload.lastName;
 
-      students[studentIndex] = {
-        ...students[studentIndex],
-        name,
-        city,
-      };
+      // Save the updated student
+      await student.save();
 
       res.json({
         message: 'Student updated',
-        student: students[studentIndex],
+        student: student,
       });
     } catch (error) {
       console.log('Error while updating a student', error);
     }
   },
-  deleteStudent: (req, res) => {
+  deleteStudent: async (req, res) => {
     try {
       const { id } = req.params;
-      const deletedStudent = students.find(
-        (student) => student.id === parseInt(id)
-      );
+      const student = await StudentModel.findByPk(id);
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+      await student.destroy();
 
-      students = students.filter((student) => student.id !== parseInt(id));
-      res.json({ message: 'Student deleted', student: deletedStudent });
+      res
+        .status(200)
+        .json({ message: 'Student deleted', deletedStudent: student });
     } catch {
       console.log('Error while deleting a student', error);
     }

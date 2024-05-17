@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import MarkController from '../../controller/mark/index.js';
+import MarksController from '../../controller/marks/index.js';
 
-const markRoute = Router();
+const marksRouter = Router();
 
-markRoute.get('/marks', MarkController.getAllMarks);
-markRoute.get('/marks/:id', MarkController.getSingleMark);
-markRoute.post('/marks', MarkController.createMark);
-markRoute.put('/marks/:id', MarkController.updateMark);
-markRoute.delete('/marks/:id', MarkController.deleteMark);
+marksRouter.get('/marks', MarksController.getAllMarks);
+marksRouter.get('/marks/:id', MarksController.getSingleMarks);
+marksRouter.post('/marks', MarksController.createMarks);
+marksRouter.put('/marks/:id', MarksController.updateMarks);
+marksRouter.delete('/marks/:id', MarksController.deleteMarks);
 
-export default markRoute;
+export default marksRouter;

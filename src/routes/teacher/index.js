@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import TeacherController from '../../controller/teacher/index.js';
 
-const teacherRoute = Router();
+const teacherRouter = Router();
 
-teacherRoute.get('/teachers', TeacherController.getAllTeachers);
-teacherRoute.get('/teachers/:id', TeacherController.getSingleTeacher);
-teacherRoute.post('/teachers', TeacherController.createTeacher);
-teacherRoute.put('/teachers/:id', TeacherController.updateTeacher);
-teacherRoute.delete('/teachers/:id', TeacherController.deleteTeacher);
+teacherRouter.get('/teachers', TeacherController.getAllTeachers);
+teacherRouter.get('/teachers/:id', TeacherController.getSingleTeacher);
+teacherRouter.post('/teachers', TeacherController.createTeacher);
+teacherRouter.put('/teachers/:id', TeacherController.updateTeacher);
+teacherRouter.delete('/teachers/:id', TeacherController.deleteTeacher);
 
-export default teacherRoute;
+export default teacherRouter;

@@ -1,8 +1,7 @@
-import attendanceRoute from './attendance/index.js';
-import markRoute from './marks/index.js';
-import studentRoute from './student/index.js';
-import teacherRoute from './teacher/index.js';
+import marksRouter from './marks/index.js';
+import studentRouter from './student/index.js';
+import teacherRouter from './teacher/index.js';
 
-const allRoutes = [markRoute, studentRoute, attendanceRoute, teacherRoute];
+const allRoutes = [studentRouter, teacherRouter, marksRouter];
 
 export default allRoutes;
