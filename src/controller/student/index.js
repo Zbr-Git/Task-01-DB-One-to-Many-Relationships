@@ -1,4 +1,4 @@
-import { where } from 'sequelize';
+
 import StudentModel from '../../model/student/index.js';
 
 

@@ -1,95 +1,150 @@
-import express from 'express';
+import sequelize from '../../db/config.js';
+import SalesModel from '../../model/sales/index.js';
+import SalePrdouctModel from '../../model/sales/salesProducts.js';
 
-const app = express();
-const PORT = 3000;
+const SalesController = {
+  getAllSales: async (req, res) => {
+    try {
+      const sales = await SalesModel.findAll();
+      res.status(200).json({
+        data: sales,
+      });
+    } catch (error) {
+      console.log('Error while fetching the Sales', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  },
+  getSingleSale: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const sale = await SalesModel.findByPk(id, {
+        include: [SalePrdouctModel],
+      });
 
-//is a collection resource
-app.get('/customers', (req, res) => {
-  res.json({
-    message: 'Home Page',
-  });
-});
+      if (!sale) {
+        return res
+          .status(404)
+          .json({ message: `No sale found with this ${id}` });
+      }
 
-// is a singleton resource
-app.get('/customers/:id', (req, res) => {
-  const custID = req.params.id;
-  res.json({
-    message: 'single customer',
-    id: custID,
-  });
-});
+      res.json({
+        message: 'Record Found',
+        sale,
+      });
+    } catch (error) {
+      console.log('Error getting single student record', error);
+      res.status(500).json({ message: 'internal server error' });
+    }
+  },
+  createSale: async (req, res) => {
+    try {
+      const payload = req.body;
 
-app.post('/customers', (req, res) => {
-  res.json({
-    message: 'POSTED customer Data',
-  });
-});
+      // Calculate total amount
+      const totalAmount = payload.salesProduct.reduce((total, product) => {
+        return total + product.productQuantity * product.rate;
+      }, 0);
 
-app.put('/customers/:id', (req, res) => {
-  const custID = req.params.id;
-  res.json({
-    message: 'update single customer data',
-    id: custID,
-  });
-});
-app.delete('/customers/:id', (req, res) => {
-  const custID = req.params.id;
-  res.json({
-    message: 'delete single customer data',
-    id: custID,
-  });
-});
+      // Create a new sale instance with the total amount
+      const sale = await SalesModel.create({ totalAmount });
 
-app.get('/blog/:id', (req, res) => {
-  const id = req.params.id;
-  const name = req.query.name;
+      console.log(`payload----${payload}`);
+      console.log(`payload.salesProduct----${payload.salesProduct}`);
 
-  // Logging request parameters
-  console.log('req.params:', req.params); 
-  console.log('req.params.id:', id);
+      // Map sales products and associate them with the sale
+      const salesProduct = payload.salesProduct.map((product) => {
+        return {
+          ...product,
+          SaleId: sale.id,
+        };
+      });
 
-  // Logging query parameters
-  console.log('req.query:', req.query);
-  console.log('req.query.name:', name);
+      // Bulk create the associated products
+      await SalePrdouctModel.bulkCreate(salesProduct);
 
-  res.json({
-    result: {
-      message: `Blog Page post ${id}`,
-    },
-  });
-});
+      // Respond with success message and created sale data
+      res.status(200).json({
+        message: 'Sale record created successfully',
+        data: sale,
+      });
+    } catch (error) {
+      console.log('Error creating a new sale', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  },
+  updateSale: async (req, res) => {
+    const { id } = req.params;
+    const payload = req.body;
 
-app.listen(PORT, () => {
-  console.log(`Server listening on ${PORT}...`);
-});
+    try {
+      // 1. Fetch the Sale with associated SaleProducts
+      const sale = await SalesModel.findByPk(id, { include: SalePrdouctModel });
+      if (!sale) {
+        return res
+          .status(404)
+          .json({ message: `Sale not found for ID: ${id}` });
+      }
 
-// app.get('/contact', (req, res) => {
-//   res.json({
-//     message: 'Contact Page',
-//   });
-// });
+      // 2. Prepare Updates for SaleProducts
+      const updatedProductsPromises = payload.salesProduct.map(
+        async (productData) => {
+          const existingProduct = sale.SaleProducts.find(
+            (p) => p.id === productData.id
+          );
+          if (!existingProduct) {
+            return res
+              .status(404)
+              .json({
+                message: `Product with ID ${productData.id} not found in this sale`,
+              });
+          }
+          await existingProduct.update({
+            productName: productData.productName,
+            productQuantity: productData.productQuantity,
+            rate: productData.rate,
+          });
+          return existingProduct; // Return the updated product
+        }
+      );
 
-// app.get('/gallery', (req, res) => {
-//   res.json({
-//     message: 'Gallery Page',
-//   });
-// });
+      // 3. Wait for All Product Updates and Recalculate Total
+      const updatedSaleProducts = await Promise.all(updatedProductsPromises);
+      const totalAmount = updatedSaleProducts.reduce((total, product) => {
+        return total + product.productQuantity * product.rate;
+      }, 0);
 
+      // 4. Update Sale Total Amount
+      await sale.update({ totalAmount });
 
+      res.status(200).json({
+        message: `Sale with ID ${id} and its products updated successfully`,
+        updatedSale: {
+          ...sale.toJSON(),
+          SaleProducts: updatedSaleProducts, // Include the updated products
+        },
+      });
+    } catch (error) {
+      console.error(`Error while updating sale with ID: ${id}`, error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  },
 
-// app.delete('/student/:id', (req, res) => {
-//   const { id } = req.params;
+  deleteSale: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const student = await StudentModel.findByPk(id);
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+      await student.destroy();
 
-//   const deletedStudent = students.filter(
-//     (student) => student.id !== parseInt(id)
-//   );
+      res
+        .status(200)
+        .json({ message: 'Student deleted', deletedStudent: student });
+    } catch {
+      console.log('Error while deleting a student', error);
+    }
+  },
+};
 
-//   // const idx = students.findIndex((student) => student.id === parseInt(id));
-
-//   // const deletedStudent = students.splice(idx, 1)[0];
-
-//   res.json({
-//     message: 'Student deleted',
-//     student: deletedStudent,
-//   });
-// });
+export default SalesController;
