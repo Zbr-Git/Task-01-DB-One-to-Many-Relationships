@@ -1,68 +1,85 @@
 import { Op } from 'sequelize';
-import sequelize from '../../db/config.js';
 import SalesModel from '../../model/sales/index.js';
 import SalePrdouctModel from '../../model/sales/salesProducts.js';
+import sequelize from '../../db/config.js';
 
 const SalesController = {
   getAllSales: async (req, res) => {
     try {
       const sales = await SalesModel.findAll();
-      res.status(200).json({
-        data: sales,
-      });
+
+      if (!sales) {
+        res.status(404).json({ message: 'Sales not Found!' });
+      }
+
+      res.status(200).json({ message: 'Sales Data Found', data: sales });
     } catch (error) {
       console.log('Error while fetching the Sales', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal Server Error' });
     }
   },
   getSingleSale: async (req, res) => {
     try {
       const { id } = req.params;
-      const { productName } = req.query; // Get product name from query parameter
+      const sale = await SalesModel.findByPk(id, {
+        include: [SalePrdouctModel],
+      });
+
+      if (!sale) {
+        res.status(404).json({ message: `No sale Found with this ID:${id}` });
+      }
+      res.status(200).json({ message: 'Sales Data Found', data: sale });
+    } catch (error) {
+      console.log('Error while fetching A Single Sale', error);
+      res.status(500).json({ message: 'Internal Server Error' });
+    }
+  },
+  getProductSale: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { productName } = req.query;
 
       const sale = await SalesModel.findByPk(id, {
         include: [
           {
             model: SalePrdouctModel,
             where: {
-              productName: { [Op.like]: `%${productName}%` }, // Filter SaleProducts by name
+              productName: {
+                [Op.like]: `%${productName}%`,
+              },
             },
           },
         ],
       });
 
       if (!sale || sale.SaleProducts.length === 0) {
-        // Check if sale exists and has matching products
-        return res
-          .status(404)
-          .json({ message: `No sale found with productt: ${productName}` });
+        return res.status(404).json({
+          message: `No sale found with product name: ${productName} for ID NO:${id}`,
+        });
       }
 
-      res.json({
-        message: 'Record Found',
+      res.status(200).json({
+        message: `Sale of ${productName}`,
         sale,
       });
     } catch (error) {
-      console.log('Error getting single sale record', error);
-      res.status(500).json({ message: 'Internal server error' });
+      console.log(
+        `Error while fetching the Sale against prodcut:${productName}`,
+        error
+      );
+      res.status(500).json({ message: 'Internal Server Error' });
     }
   },
   createSale: async (req, res) => {
     try {
       const payload = req.body;
 
-      // Calculate total amount
       const totalAmount = payload.salesProduct.reduce((total, product) => {
         return total + product.productQuantity * product.rate;
       }, 0);
 
-      // Create a new sale instance with the total amount
       const sale = await SalesModel.create({ totalAmount });
 
-      console.log(`payload----${payload}`);
-      console.log(`payload.salesProduct----${payload.salesProduct}`);
-
-      // Map sales products and associate them with the sale
       const salesProduct = payload.salesProduct.map((product) => {
         return {
           ...product,
@@ -73,7 +90,6 @@ const SalesController = {
       // Bulk create the associated products
       await SalePrdouctModel.bulkCreate(salesProduct);
 
-      // Respond with success message and created sale data
       res.status(200).json({
         message: 'Sale record created successfully',
         data: sale,
@@ -88,7 +104,7 @@ const SalesController = {
     const payload = req.body;
 
     try {
-      // 1. Fetch Sale with SaleProducts for Update
+     
       const sale = await SalesModel.findByPk(id, { include: SalePrdouctModel });
       if (!sale) {
         return res
@@ -96,9 +112,9 @@ const SalesController = {
           .json({ message: `Sale not found for ID: ${id}` });
       }
 
-      // 2. Update SaleProducts
+      
       for (const productData of payload.salesProduct) {
-        // Removed updatedSaleProducts
+        
         const existingProduct = sale.SaleProducts.find(
           (p) => p.id === productData.id
         );
@@ -108,14 +124,14 @@ const SalesController = {
           });
         }
         await existingProduct.update({
-          // Update directly
+         
           productName: productData.productName,
           productQuantity: productData.productQuantity,
           rate: productData.rate,
         });
       }
 
-      // 3. Recalculate and Update Total Amount (no changes here)
+      
       const totalAmount = sale.SaleProducts.reduce(
         (total, product) => total + product.productQuantity * product.rate,
         0
@@ -126,7 +142,7 @@ const SalesController = {
         message: `Sale with ID ${id} and its products updated successfully`,
         updatedSale: {
           ...sale.toJSON(),
-          SaleProducts: sale.SaleProducts, // Use the updated products from the sale instance
+          SaleProducts: sale.SaleProducts, 
         },
       });
     } catch (error) {
@@ -135,10 +151,9 @@ const SalesController = {
     }
   },
   deleteProductFromSalesProduct: async (req, res) => {
-    const { s_id: saleId, p_id: productId } = req.params;
-
     try {
-      // 1. Delete the Product Directly
+      const { s_id: saleId, p_id: productId } = req.params;
+      
       const deletedCount = await SalePrdouctModel.destroy({
         where: { id: productId, SaleId: saleId }, // Filter by both productId and saleId
       });
@@ -149,12 +164,12 @@ const SalesController = {
         });
       }
 
-      // 2. Fetch the updated sale with its products after deletion
+     
       const updatedSale = await SalesModel.findByPk(saleId, {
         include: SalePrdouctModel,
       });
 
-      // 3. Recalculate the total amount for the sale
+      
       const totalAmount = updatedSale.SaleProducts.reduce(
         (total, product) => total + product.productQuantity * product.rate,
         0
@@ -176,10 +191,10 @@ const SalesController = {
       const { id } = req.params;
 
       return sequelize.transaction(async (t) => {
-        // Find the sale with its products
+        
         const sale = await SalesModel.findByPk(id, {
           include: [SalePrdouctModel],
-          transaction: t, // Use the transaction
+          transaction: t, 
         });
 
         if (!sale) {
@@ -188,7 +203,7 @@ const SalesController = {
             .json({ message: `No sale found with this ${id}` });
         }
 
-        // Delete the sale (products will be deleted due to cascade)
+        
         await sale.destroy({ transaction: t });
 
         res.status(200).json({

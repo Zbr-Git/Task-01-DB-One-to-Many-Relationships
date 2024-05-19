@@ -5,6 +5,7 @@ const salesRouter = Router();
 salesRouter.get('/sales', SalesController.getAllSales);
 
 salesRouter.get('/sales/:id', SalesController.getSingleSale);
+// salesRouter.get('/sales/:id', SalesController.getProductSale); // with query
 salesRouter.post('/sales', SalesController.createSale);
 
 salesRouter.put('/sales/:id', SalesController.updateSale);
