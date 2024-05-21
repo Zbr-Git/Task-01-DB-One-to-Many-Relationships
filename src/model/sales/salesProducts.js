@@ -1,26 +1,23 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../../db/config.js';
 import SalesModel from './index.js';
+import ProductsModel from './products.js';
 
-const SalePrdouctModel = sequelize.define('SaleProduct', {
-  productName: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
+const SalesPrdouctModel = sequelize.define('SaleProduct', {
   productQuantity: {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  rate: {
+  price: {
     type: DataTypes.DOUBLE,
     allowNull: false,
   },
 });
 
-SalesModel.hasMany(SalePrdouctModel, {
-  onDelete: 'CASCADE',
-});
-SalePrdouctModel.belongsTo(SalesModel);
+SalesModel.hasMany(SalesPrdouctModel);
+SalesPrdouctModel.belongsTo(SalesModel);
 
-export default SalePrdouctModel;
- 
+ProductsModel.hasMany(SalesPrdouctModel);
+SalesPrdouctModel.belongsTo(ProductsModel);
+
+export default SalesPrdouctModel;

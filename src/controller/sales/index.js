@@ -2,6 +2,7 @@ import { Op } from 'sequelize';
 import SalesModel from '../../model/sales/index.js';
 import SalePrdouctModel from '../../model/sales/salesProducts.js';
 import sequelize from '../../db/config.js';
+import ProductsModel from '../../model/sales/products.js';
 
 const SalesController = {
   getAllSales: async (req, res) => {
@@ -22,7 +23,7 @@ const SalesController = {
     try {
       const { id } = req.params;
       const sale = await SalesModel.findByPk(id, {
-        include: [SalePrdouctModel],
+        include: [SalePrdouctModel, Pro],
       });
 
       if (!sale) {
@@ -74,37 +75,81 @@ const SalesController = {
     try {
       const payload = req.body;
 
-      const totalAmount = payload.salesProduct.reduce((total, product) => {
-        return total + product.productQuantity * product.rate;
-      }, 0);
+      const totalAmount = payload.salesProduct.reduce(
+        (total, product) => total + product.productQuantity * product.price,
+        0
+      );
 
-      const sale = await SalesModel.create({ totalAmount });
+      const result = await sequelize.transaction(async (t) => {
+        const sale = await SalesModel.create(
+          { totalAmount },
+          { transaction: t }
+        );
 
-      const salesProduct = payload.salesProduct.map((product) => {
-        return {
-          ...product,
-          SaleId: sale.id,
-        };
+        const productNames = payload.salesProduct.map(
+          (product) => product.name
+        );
+        const foundProducts = await ProductsModel.findAll({
+          where: { name: productNames },
+          transaction: t,
+        });
+
+        console.log(`~~~${foundProducts}~~~`);
+
+        const productMap = {};
+        for (const product of foundProducts) {
+          console.log(`-+-${product.name}+-+`);
+          productMap[product.name] = product.id;
+          console.log(
+            `=> -------productMap[product.name]-----:::${
+              productMap[product.name]
+            }`
+          );
+        }
+
+        const saleProducts = payload.salesProduct.map((product) => {
+          if (!productMap[product.name]) {
+            res
+              .status(500)
+              .json({ message: `Product not found: ${product.name}` });
+          }
+          return {
+            ...product,
+            SaleId: sale.id,
+            ProductId: productMap[product.name],
+          };
+        });
+
+        const createdSaleProducts = await SalePrdouctModel.bulkCreate(
+          saleProducts,
+          {
+            transaction: t,
+          }
+        );
+
+        return { sale, saleProducts: createdSaleProducts };
       });
-
-      // Bulk create the associated products
-      await SalePrdouctModel.bulkCreate(salesProduct);
 
       res.status(200).json({
         message: 'Sale record created successfully',
-        data: sale,
+        data: result,
       });
     } catch (error) {
-      console.log('Error creating a new sale', error);
+      console.error('Error creating a new sale:', error);
+
+      // if (sequelize.currentTransaction) {
+      //   await sequelize.currentTransaction.rollback();
+      // }
+
       res.status(500).json({ message: 'Internal Server Error' });
     }
   },
+
   updateSale: async (req, res) => {
     const { id } = req.params;
     const payload = req.body;
 
     try {
-     
       const sale = await SalesModel.findByPk(id, { include: SalePrdouctModel });
       if (!sale) {
         return res
@@ -112,9 +157,7 @@ const SalesController = {
           .json({ message: `Sale not found for ID: ${id}` });
       }
 
-      
       for (const productData of payload.salesProduct) {
-        
         const existingProduct = sale.SaleProducts.find(
           (p) => p.id === productData.id
         );
@@ -124,14 +167,12 @@ const SalesController = {
           });
         }
         await existingProduct.update({
-         
           productName: productData.productName,
           productQuantity: productData.productQuantity,
           rate: productData.rate,
         });
       }
 
-      
       const totalAmount = sale.SaleProducts.reduce(
         (total, product) => total + product.productQuantity * product.rate,
         0
@@ -142,7 +183,7 @@ const SalesController = {
         message: `Sale with ID ${id} and its products updated successfully`,
         updatedSale: {
           ...sale.toJSON(),
-          SaleProducts: sale.SaleProducts, 
+          SaleProducts: sale.SaleProducts,
         },
       });
     } catch (error) {
@@ -153,7 +194,7 @@ const SalesController = {
   deleteProductFromSalesProduct: async (req, res) => {
     try {
       const { s_id: saleId, p_id: productId } = req.params;
-      
+
       const deletedCount = await SalePrdouctModel.destroy({
         where: { id: productId, SaleId: saleId }, // Filter by both productId and saleId
       });
@@ -164,12 +205,10 @@ const SalesController = {
         });
       }
 
-     
       const updatedSale = await SalesModel.findByPk(saleId, {
         include: SalePrdouctModel,
       });
 
-      
       const totalAmount = updatedSale.SaleProducts.reduce(
         (total, product) => total + product.productQuantity * product.rate,
         0
@@ -191,10 +230,9 @@ const SalesController = {
       const { id } = req.params;
 
       return sequelize.transaction(async (t) => {
-        
         const sale = await SalesModel.findByPk(id, {
           include: [SalePrdouctModel],
-          transaction: t, 
+          transaction: t,
         });
 
         if (!sale) {
@@ -203,7 +241,6 @@ const SalesController = {
             .json({ message: `No sale found with this ${id}` });
         }
 
-        
         await sale.destroy({ transaction: t });
 
         res.status(200).json({
